@@ -5,13 +5,14 @@ PI = 3.142*1.2; //Add a fudge factor for the bend radius
 
 function hingeLength(angle, radius) = 2*PI*radius*(angle/360);
 
-//Draws a flat 3D model of a living hinge
+//Draws a flat model of a living hinge. Comment out projection() if you want a 3d model
+projection()
 livingHinge2D(hingeLength(90,10), hingeHeight, 2.7);
 
 //Draws a rounded 3D model of a living hinge
-translate([0, 30, 0])
-rotate([0, 90, 0])
-livingHinge3D(90, 10, hingeHeight, 2.7);
+//translate([0, 30, 0])
+//rotate([0, 90, 0])
+//livingHinge3D(90, 10, hingeHeight, 2.7);
 
 module livingHinge2D(panelLength, panelWidth, panelThickness) 
 {

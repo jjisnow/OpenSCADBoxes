@@ -1,318 +1,174 @@
+// Dimensions in millimetres. See README.md for export and calibration.
 height = 40; width = 80; depth = 80;
 thickness = 2.7; cornerRadius = 10; tabLength = 10;
+slotRepeatMin = 2; slotLengthMin = 20; slotLengthGap = 2; slotWidth = 0.2;
+bendAllowance = 1.02;
+// Total extra width of a mating slot; independent of kerf compensation.
+jointClearance = 0.1;
+kerf = 0;
+partGap = 3;
+explodeDistance = 10;
+outputMode = "cut"; // [cut,flat,preview]
+include <lib/common.scad>
 
-slotRepeatMin=2; slotLengthMin=20; slotLengthGap = 2; slotWidth = 0.2;
+validateBox(height, width, depth, thickness, cornerRadius, tabLength)
+    assert(height-2*cornerRadius >= tabLength+jointClearance, "height is too small for FlexBox1 rounded end tabs")
+    if (outputMode == "cut")
+        cuttingProjection() makeBox(true);
+    else if (outputMode == "flat")
+        makeBox(true);
+    else
+        makeBox(false);
 
-PI = 3.142*1.02; //Add a fudge factor for the bend radius
-function hingeLength(angle, radius) = 2*PI*radius*(angle/360);
-
-//Use true to generate 3D models of the box parts
-//Use false to generate 2D models which can be exported
-if(true)
-{
-  //Draws a folded version of the box
-  translate([-width,depth+width,0])
-    makeBox(false);
-
-  //Draws a flat version of the box
-  translate([width+height,depth+width,0])
-    makeBox(true);
-}
-else
-{
-  // Projection allows it to draw a 2D version of the box
-  // Which can be saved as SVG
-  projection()
-    translate([width+height,depth+width,0])
-      makeBox(true);
-}
-
-// Generates the box in flat or folded parts
+// Flat layout uses nominal bounds, leaving partGap before kerf compensation.
+// Folded parts are schematic; explodeDistance controls inspection spacing.
 module makeBox(flat)
 {
-  if(flat)
-  {
-    union() 
+    if (flat)
     {
-      translate([-(width+(4*thickness))/2 -thickness -1, 0, 0])
-        boxSide2D(width+(4*thickness), depth, height, thickness, cornerRadius, false);
+        union()
+        {
+            translate([0, 0, 0])
+                boxSide2D(width+(4*thickness), depth, height, thickness, cornerRadius, false);
 
-      translate([height/2 + thickness +1, 0, 0])
-        boxSide2D(height, depth, width, thickness, cornerRadius, true);
+            translate([(width+4*thickness)/2 + partGap + height/2 + thickness, 0, 0])
+                boxSide2D(height, depth, width, thickness, cornerRadius, true);
+        }
     }
-  }
-  else
-  {
-    rotate([0,0,90])
+    else
     {
-      translate([50,0,0])
-        boxSide3D(height, width, depth, thickness, cornerRadius, true);
+        rotate([0,0,90])
+        {
+            translate([explodeDistance/2,0,0])
+                boxSide3D(height, width, depth, thickness, cornerRadius, true);
 
-      translate([-50,0,0])
-      rotate([90,0,180])
-        boxSide3D(width+(4*thickness), height, depth, thickness,    cornerRadius, false);
+            translate([-explodeDistance/2,0,0])
+            rotate([90,0,180])
+                boxSide3D(width+(4*thickness), height, depth, thickness,    cornerRadius, false);
+        }
     }
-  }
 }
 
 module boxSide3D(height, width, depth, thickness, cornerRadius, tabsOut)
 {
-  faceWidth1 = depth-(2*cornerRadius);
-  faceWidth2 = width-(2*cornerRadius);
-  faceHeight = height;
+    faceWidth1 = depth-(2*cornerRadius);
+    faceWidth2 = width-(2*cornerRadius);
+    faceHeight = height;
 
-  translate([(faceWidth1+thickness)/2 + cornerRadius,0,0])
-  {
-    translate([0,(faceWidth2+thickness)/2 + cornerRadius,0])
-      livingHinge3D(90, cornerRadius, faceHeight, thickness);
-      
-      translate([0,-(faceWidth2+thickness)/2 + -cornerRadius,0])
-      rotate([0,0,-90])
-      livingHinge3D(90, cornerRadius, faceHeight, thickness);
-      
-    rotate([0,90,0])
-      tabPanel(faceHeight, faceWidth2, thickness, tabLength, tabsOut);
-  }
-   
-  rotate([-90,90,0])
-  {
-    translate([0,0,(faceWidth2+thickness)/2 + cornerRadius])
-      boxEnd(faceHeight, faceWidth1, thickness, tabLength, cornerRadius, tabsOut);
-        
-    translate([0,0,-(faceWidth2+thickness)/2 - cornerRadius])
-      boxEnd(faceHeight, faceWidth1, thickness, tabLength, cornerRadius, tabsOut);
-  }
+    translate([(faceWidth1+thickness)/2 + cornerRadius,0,0])
+    {
+        translate([0,(faceWidth2+thickness)/2 + cornerRadius,0])
+            livingHinge3D(90, cornerRadius, faceHeight, thickness);
+
+            translate([0,-(faceWidth2+thickness)/2 + -cornerRadius,0])
+            rotate([0,0,-90])
+            livingHinge3D(90, cornerRadius, faceHeight, thickness);
+
+        rotate([0,90,0])
+            tabPanel(faceHeight, faceWidth2, thickness, tabLength, tabsOut);
+    }
+
+    rotate([-90,90,0])
+    {
+        translate([0,0,(faceWidth2+thickness)/2 + cornerRadius])
+            boxEnd(faceHeight, faceWidth1, thickness, tabLength, cornerRadius, tabsOut);
+
+        translate([0,0,-(faceWidth2+thickness)/2 - cornerRadius])
+            boxEnd(faceHeight, faceWidth1, thickness, tabLength, cornerRadius, tabsOut);
+    }
 }
 
 module boxSide2D(height, width, depth, thickness, cornerRadius, tabsOut)
 {
-  faceWidth1 = depth-(2*cornerRadius);
-  faceWidth2 = width-(2*cornerRadius);
-  hingeLength1 = hingeLength(90, cornerRadius);
-  union()
-  {
-    tabPanel(height, faceWidth1, thickness, tabLength, tabsOut);
+    faceWidth1 = depth-(2*cornerRadius);
+    faceWidth2 = width-(2*cornerRadius);
+    hingeLength1 = hingeLength(90, cornerRadius);
+    union()
+    {
+        tabPanel(height, faceWidth1, thickness, tabLength, tabsOut);
 
-      translate([0,(faceWidth1 + hingeLength1)/2,0])
-      {
-        livingHinge2D(hingeLength1, height, thickness);
-      
-        translate([0,(hingeLength1 + faceWidth2)/2,0])
-          boxEnd(height, faceWidth2, thickness, tabLength, cornerRadius, tabsOut);
-      }
+            translate([0,(faceWidth1 + hingeLength1)/2,0])
+            {
+                livingHinge2D(hingeLength1, height, thickness);
 
-    mirror([0,1,0])
-      translate([0,(faceWidth1 + hingeLength1)/2,0])
-      {
-        livingHinge2D(hingeLength1, height, thickness);
-      
-        translate([0,(hingeLength1 + faceWidth2)/2,0])
-          boxEnd(height, faceWidth2, thickness, tabLength, cornerRadius, tabsOut);
-      }
-  } 
+                translate([0,(hingeLength1 + faceWidth2)/2,0])
+                    boxEnd(height, faceWidth2, thickness, tabLength, cornerRadius, tabsOut);
+            }
+
+        mirror([0,1,0])
+            translate([0,(faceWidth1 + hingeLength1)/2,0])
+            {
+                livingHinge2D(hingeLength1, height, thickness);
+
+                translate([0,(hingeLength1 + faceWidth2)/2,0])
+                    boxEnd(height, faceWidth2, thickness, tabLength, cornerRadius, tabsOut);
+            }
+    }
 }
 
 module boxEnd(height, width, thickness, tabLength, cornerRadius, tabsOut)
 {
-  tabPanel(height, width, thickness, tabLength, tabsOut);
- 
-  translate([0,width/2,0])
-    tabbedEnd( height, thickness, cornerRadius, tabsOut);        
+    tabPanel(height, width, thickness, tabLength, tabsOut);
+
+    translate([0,width/2,0])
+        tabbedEnd( height, thickness, cornerRadius, tabsOut);
 }
 
 
-module tabPanel(panelHeight, panelWidth, panelThickness, tabLength, tabsOut=false)
+module tabbedEnd(panelWidth, panelThickness, radius, tabsOut)
 {
-  noTabsX = panelWidth /tabLength;
-  noTabs = floor(noTabsX/2)+floor(noTabsX)%2;
-  
-  if(tabsOut)  
-  union()
-  {
-    cube([panelHeight, panelWidth , panelThickness], true);
-
-    union()
-    {
-      translate([(panelHeight+panelThickness)/2,0,0])
-        rotate([0,0,90])
-          makeTabs(noTabs, tabLength, panelThickness);
-
-      translate([(-panelHeight-panelThickness)/2,0,0])
-        rotate([0,0,90])
-          makeTabs(noTabs, tabLength, panelThickness);
-    }
-  }
-  
-  else
-  difference()
-  {
-    cube([panelHeight, panelWidth , panelThickness], true);
-
-    union()
-    {
-      translate([(panelHeight-(3*panelThickness))/2,0,0])
-        rotate([0,0,90])
-          makeTabs(noTabs, tabLength, panelThickness);
-
-      translate([(-panelHeight+(3*panelThickness))/2,0,0])
-        rotate([0,0,90])
-          makeTabs(noTabs, tabLength, panelThickness);
-    }
-  }
+    if (tabsOut)
+        roundedEnd(panelWidth-(2*radius), panelThickness, radius, tabsOut);
+    else
+        roundedEnd(panelWidth-(2*radius)-(4*panelThickness), panelThickness, radius+(2*panelThickness), tabsOut);
 }
 
-module livingHinge2D(panelLength, panelWidth, panelThickness) 
+module roundedEnd(faceWidth, panelThickness, radius, tabsOut)
 {
-  widthDiv = floor(panelWidth/slotLengthMin);
-  noSlots = floor(panelLength/slotRepeatMin)-1;
-  slotRepeat = (panelWidth/widthDiv); 
-  slotLength = panelLength / (noSlots + 1);
+    noTabs = tabCount(faceWidth, tabLength);
 
-  difference() 
-  {
-    cube([panelWidth, panelLength, panelThickness], true);
-    
-    translate([-panelWidth/2,-panelLength/2,-panelThickness/2])
-    for(y=[0:(widthDiv*2)-1]) 
-    {           
-      for (x =[1:noSlots])
-      {
-        if(x%2)
-          translate([y*slotRepeat,0,0])
-            translate([slotLengthGap*(y%2),(slotLength *x)-slotWidth/2,0])
-              cube([slotRepeat-slotLengthGap, slotWidth, panelThickness]);
-        else
-          translate([y*slotRepeat,0,0])
-            translate([slotLengthGap*(1-(y%2)),(slotLength *x)-slotWidth/2,0])
-              cube([slotRepeat-slotLengthGap, slotWidth, panelThickness]);
-      }
-    }
-  }
-}
-
-module livingHinge3D(angle, radius, panelWidth, panelThickness) 
-{
-  module pie(radius, angle, height, spin=0) 
-  {
-    // submodules
-    module pieCube() 
+    if (tabsOut)
     {
-      translate([-radius - 1, 0, -1]) 
-        cube([2*(radius + 1), radius, height + 2]);
-    }
-        
-    ang = abs(angle % 360);
-    negAng = angle < 0 ? angle : 0;
-        
-    rotate([0,0,negAng + spin]) 
-    {
-      if (angle == 0) 
-        cylinder(r=radius, h=height, $fn=48);
-      
-      else if (abs(angle) > 0 && ang <= 180) 
-      {
-        difference() 
+        union()
         {
-          intersection() 
-          {
-            cylinder(r=radius, h=height, $fn=48);
-            translate([0,0,0]) 
-              pieCube();
-          }
-          
-          rotate([0, 0, ang])
-            pieCube();
+            translate([0,0,-panelThickness/2])
+                roundedInsideEnd(faceWidth+(2*radius), panelThickness, radius);
+
+            translate([0,radius+panelThickness/2,0])
+                makeTabs(noTabs, tabLength, panelThickness);
         }
-      } 
-      else if (ang > 180) 
-      {
-        intersection() 
+    }
+    else
+    {
+        difference()
         {
-          cylinder(r=radius, h=height, $fn=48);
-          union() 
-          {
-            translate([0, 0, 0])
-              pieCube();
-            
-            rotate([0, 0, ang - 180])
-              pieCube();
-          }
+            translate([0,0,-panelThickness/2])
+                roundedInsideEnd(faceWidth+(2*radius), panelThickness, radius);
+
+            translate([0,radius-(1.5*panelThickness),0])
+                makeTabs(noTabs, tabLength, panelThickness, jointClearance, true);
         }
-      }
     }
-  }
-  
-  translate([-(radius+(panelThickness/2)),-(radius+(panelThickness/2)),-panelWidth/2])
-    rotate([0,0,0])
-      difference() 
-      {
-        pie(radius+panelThickness, angle, panelWidth, spin = 0);
-        pie(radius, angle, panelWidth, spin = 0);
-      }
 }
 
-module tabbedEnd(panelWidth, panelThickness, radius, tabsOut) 
+module roundedInsideEnd(panelWidth, panelThickness, radius)
 {
-  if(tabsOut)
-    roundedEnd(panelWidth-(2*radius), panelThickness, radius, tabsOut);
-  else
-    roundedEnd(panelWidth-(2*radius)-(4*panelThickness), panelThickness, radius+(2*panelThickness), tabsOut);
-}
-
-module roundedEnd(faceWidth, panelThickness, radius, tabsOut) 
-{
-  noTabsX = faceWidth /tabLength;
-  noTabs = floor(noTabsX/2)+floor(noTabsX)%2;
- 
-  if(tabsOut)
-  {
-    union() 
+    sub = curveSegments;
+    faceWidth = panelWidth - (2*radius);
+    assert(faceWidth >= tabLength+jointClearance, "rounded end is too small for tabs");
+    intersection()
     {
-      translate([0,0,-panelThickness/2])
-        roundedInsideEnd(faceWidth+(2*radius), panelThickness, radius);
-        
-      translate([0,radius+panelThickness/2,0])
-        makeTabs(noTabs, tabLength, panelThickness);
-    }
-  }
-  else
-  {
-    difference() 
-    {
-      translate([0,0,-panelThickness/2])
-        roundedInsideEnd(faceWidth+(2*radius), panelThickness, radius);
-    
-      translate([0,radius-(1.5*panelThickness),0])
-        makeTabs(noTabs, tabLength, panelThickness+.1);
-    }
-  }
-}
+        translate([-panelWidth/2,0,0])
+            cube([panelWidth, radius, panelThickness]);
 
-module roundedInsideEnd(panelWidth, panelThickness, radius) 
-{
-  sub = 48;
-  faceWidth = panelWidth - (2*radius);
-  intersection() 
-  {
-    translate([-panelWidth/2,0,0])
-      cube([panelWidth, radius, panelThickness]);
-    
-    union() 
-    {
-      translate([-faceWidth/2,0,0])
-        cube([faceWidth, radius, panelThickness]);
-      translate([-panelWidth/2 + radius,0,0])
-        cylinder(r=radius, h=panelThickness, $fn=sub);
-      translate([panelWidth/2 - radius,0,0])
-        cylinder(r=radius, h=panelThickness, $fn=sub);
+        union()
+        {
+            translate([-faceWidth/2,0,0])
+                cube([faceWidth, radius, panelThickness]);
+            translate([-panelWidth/2 + radius,0,0])
+                cylinder(r=radius, h=panelThickness, $fn=sub);
+            translate([panelWidth/2 - radius,0,0])
+                cylinder(r=radius, h=panelThickness, $fn=sub);
+        }
     }
-  }
-}
-
-module makeTabs(noTabs, tabLength, panelThickness)
-{
-  union()
-    for (i =[-noTabs+1:2:noTabs-1])
-      translate([(i*tabLength),0,0])
-        cube([tabLength, panelThickness, panelThickness], true);
 }
